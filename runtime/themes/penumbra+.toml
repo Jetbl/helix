@@ -48,6 +48,10 @@ error = "red"
 "diagnostic.warning".underline = { color = "yellow", style = "curl" } 
 "diagnostic.error".underline = { color = "red", style = "curl" } 
 
+"ui.virtual.inlay-hint" = "sky-"          # Default style for inlay hints of all kinds
+# "ui.virtual.inlay-hint.parameter" =  { color = "sky-", style = "curl" }# Style for inlay hints of kind `parameter` (LSPs are not required to set a kind)
+# "ui.virtual.inlay-hint.type" = { color = "sky-", style = "curl" }
+
 "ui.background" = { bg = "shade" }
 "ui.background.separator" = "sky"
 
