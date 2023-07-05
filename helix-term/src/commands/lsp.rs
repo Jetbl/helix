@@ -552,7 +552,12 @@ impl ui::menu::Item for CodeActionOrCommandItem {
         }
     }
 }
-
+impl ui::menu::Item for lsp::MessageActionItem {
+    type Data = ();
+    fn format(&self, _data: &Self::Data) -> Row {
+        self.title.as_str().into()
+    }
+}
 /// Determines the category of the `CodeAction` using the `CodeAction::kind` field.
 /// Returns a number that represent these categories.
 /// Categories with a lower number should be displayed first.

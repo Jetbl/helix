@@ -3,10 +3,10 @@ use futures_util::Stream;
 use helix_core::{
     diagnostic::{DiagnosticTag, NumberOrString},
     path::get_relative_path,
-    pos_at_coords, syntax, Selection,
+    pos_at_coords, syntax, Rope, Selection,
 };
 use helix_lsp::{
-    lsp::{self, notification::Notification},
+    lsp::{self, MessageType, notification::Notification},
     util::lsp_pos_to_pos,
     LspProgressMap,
 };
@@ -29,7 +29,7 @@ use crate::{
     config::Config,
     job::Jobs,
     keymap::Keymaps,
-    ui::{self, overlay::overlaid},
+    ui::{self, overlay::overlaid, FileLocation, Picker, Popup},
 };
 
 use log::{debug, error, warn};
@@ -1063,6 +1063,58 @@ impl Application {
                     }
                     Ok(MethodCall::WorkspaceFolders) => {
                         Ok(json!(&*language_server!().workspace_folders().await))
+                    }
+
+                    Ok(MethodCall::ShowMessageRequest(params)) => {
+                        if let Some(actions) = params.actions {
+                            let call_id = id.clone();
+                            let message_type = match params.typ {
+                                MessageType::ERROR => "ERROR",
+                                MessageType::WARNING => "WARNING",
+                                MessageType::INFO => "INFO",
+                                _ => "LOG",
+                            };
+                            let message = format!("{}: {}", message_type, &params.message);
+                            let rope = Rope::from(message);
+                            let picker =
+                                Picker::new(actions, (), move |ctx, message_action, _event| {
+                                    let server_from_id =
+                                        ctx.editor.language_servers.get_by_id(server_id);
+                                    let language_server = match server_from_id {
+                                        Some(language_server) => language_server,
+                                        None => {
+                                            warn!(
+                                                "can't find language server with id `{server_id}`"
+                                            );
+                                            return;
+                                        }
+                                    };
+                                    // let response = match message_action {
+                                    //     Some(item) => json!(item),
+                                    //     None => serde_json::Value::Null,
+                                    // };
+                                    let response = json!(message_action);
+
+                                    tokio::spawn(
+                                        language_server.reply(call_id.clone(), Ok(response)),
+                                    );
+                                })
+                                .with_preview(
+                                    move |_editor, _value| {
+                                        let file_location: FileLocation =
+                                            (rope.clone().into(), None);
+                                        Some(file_location)
+                                    },
+                                );
+                            let popup_id = "show-message-request";
+                            let popup = Popup::new(popup_id, picker);
+                            self.compositor.replace_or_push(popup_id, popup);
+                            // do not send a reply just yet
+                            // None
+                            return;
+                        } else {
+                            Ok(serde_json::Value::Null)
+                        }
                     }
                     Ok(MethodCall::WorkspaceConfiguration(params)) => {
                         let language_server = language_server!();

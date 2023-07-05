@@ -28,7 +28,7 @@ use std::{collections::HashMap, io::Read, path::PathBuf};
 use crate::ui::{Prompt, PromptEvent};
 use helix_core::{
     movement::Direction, text_annotations::TextAnnotations,
-    unicode::segmentation::UnicodeSegmentation, Position, Syntax,
+    unicode::segmentation::UnicodeSegmentation, Position, Rope, Syntax,
 };
 use helix_view::{
     editor::Action,
@@ -48,6 +48,7 @@ pub const MAX_FILE_SIZE_FOR_PREVIEW: u64 = 10 * 1024 * 1024;
 pub enum PathOrId {
     Id(DocumentId),
     Path(PathBuf),
+    Text(Rope),
 }
 
 impl PathOrId {
@@ -56,7 +57,14 @@ impl PathOrId {
         Ok(match self {
             Path(path) => Path(helix_core::path::get_canonicalized_path(&path)?),
             Id(id) => Id(id),
+            Text(rope) => Text(rope),
         })
+    }
+}
+
+impl From<Rope> for PathOrId {
+    fn from(text: Rope) -> Self {
+        Self::Text(text)
     }
 }
 
@@ -89,6 +97,7 @@ pub enum CachedPreview {
 pub enum Preview<'picker, 'editor> {
     Cached(&'picker CachedPreview),
     EditorDocument(&'editor Document),
+    Text(Box<Document>),
 }
 
 impl Preview<'_, '_> {
@@ -96,6 +105,7 @@ impl Preview<'_, '_> {
         match self {
             Preview::EditorDocument(doc) => Some(doc),
             Preview::Cached(CachedPreview::Document(doc)) => Some(doc),
+            Preview::Text(doc) => Some(doc.as_ref()),
             _ => None,
         }
     }
@@ -103,6 +113,7 @@ impl Preview<'_, '_> {
     /// Alternate text to show for the preview.
     fn placeholder(&self) -> &str {
         match *self {
+            Self::Text(_) => "<Text>",
             Self::EditorDocument(_) => "<File preview>",
             Self::Cached(preview) => match preview {
                 CachedPreview::Document(_) => "<File preview>",
@@ -427,6 +438,10 @@ impl<T: Item + 'static> Picker<T> {
                 let doc = editor.documents.get(&id).unwrap();
                 Preview::EditorDocument(doc)
             }
+            PathOrId::Text(rope) => {
+                let doc = Document::from(rope, None, editor.config.clone());
+                Preview::Text(Box::new(doc))
+            }
         }
     }
 
@@ -442,6 +457,7 @@ impl<T: Item + 'static> Picker<T> {
                 Some(CachedPreview::Document(ref mut doc)) => doc,
                 _ => return EventResult::Consumed(None),
             },
+            PathOrId::Text(_rope) => todo!(),
         };
 
         let mut callback: Option<compositor::Callback> = None;
@@ -475,6 +491,7 @@ impl<T: Item + 'static> Picker<T> {
                                 Some(CachedPreview::Document(ref mut doc)) => doc,
                                 _ => return,
                             },
+                            PathOrId::Text(_) => todo!(),
                         };
                         doc.syntax = Some(syntax);
                     };
