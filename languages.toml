@@ -2710,3 +2710,14 @@ injection-regex = "wren"
 file-types = ["wren"]
 roots = []
 indent = { tab-width = 2, unit = "  "}
+
+[[language]]
+name = "filament"
+scope = "source.fil"
+file-types = ["fil"]
+roots = []
+indent = { tab-width = 2, unit = "  "}
+
+[[grammar]]
+name = "filament"
+source = { path = "/home/adiallo/wks/tree-sitter/tree-sitter-filament"}
